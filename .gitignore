@@ -1,0 +1,14 @@
+/env/
+*/dist/
+*/build/
+/.vscode/
+/__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+.env
+*.xlsx
+*.zip
+*.db
+*.spec
+icon.ico
+test_test3.py
