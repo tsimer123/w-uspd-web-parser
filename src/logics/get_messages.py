@@ -48,7 +48,7 @@ async def get_messages(task_rb: TaskEquipmentHandlerModelGet) -> GetComandModel:
         if auth.status is True:
             # token = auth.data
             try:
-                # полуячаем данные по УСПД
+                # получаем данные по УСПД
                 result.equipment_info = await get_local_id(con)
                 if result.equipment_info.status is True:
                     result.meter_packet = await get_packet(con)

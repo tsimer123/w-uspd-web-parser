@@ -171,8 +171,7 @@ def get_update_wl(meter_wl_from_db: list[MeterWLHandModelGet], result_in: GetCom
             if line_dwl.modem == line_mwl.number:
                 update_wl.append(
                     WLModelUpdate(
-                        equipment_id=result_in.equipment_id,
-                        meter_id=line_dwl.meter_id,
+                        wl_id=line_dwl.wl_id,
                         last_success=line_mwl.last_success_dl_ts,
                         present=True,
                     )
@@ -180,7 +179,7 @@ def get_update_wl(meter_wl_from_db: list[MeterWLHandModelGet], result_in: GetCom
                 trigger_upd = 1
                 break
         if trigger_upd == 0:
-            update_wl.append(WLModelUpdate(present=False))
+            update_wl.append(WLModelUpdate(wl_id=line_dwl.wl_id, present=False))
 
     return update_wl
 

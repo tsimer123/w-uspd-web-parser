@@ -20,7 +20,7 @@ class Equipment(Base):
     __tablename__ = 'equipment'
 
     equipment_id: Mapped[int] = mapped_column(primary_key=True)
-    serial: Mapped[str | None] = mapped_column(Text)
+    serial: Mapped[int | None] = mapped_column(Text)
     serial_in_sourse: Mapped[str] = mapped_column(Text)
     ip1: Mapped[str] = mapped_column(Text)
     ip2: Mapped[str | None] = mapped_column(Text)

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from sqlalchemy import and_, insert, select, update
 
@@ -31,7 +32,7 @@ from sql.model import (
     WLModelSet,
     WLModelUpdate,
 )
-from sql.scheme import Equipment, GroupTask, Messages, Meter, Task, Wl, create_db
+from sql.scheme import Equipment, GroupTask, LogEquipment, Messages, Meter, Task, Wl, create_db
 
 
 async def start_db(type_start):
@@ -265,17 +266,21 @@ async def update_data_after_hand(
             stmt_equipment = update(Equipment)
             await session.execute(stmt_equipment, equipment_update)
 
-        if len(meter['update_meter']) > 0:
-            meter_update = [line_um.model_dump(exclude_none=True) for line_um in meter['update_meter']]
-            stmt_meter_update = update(Meter)
-            await session.execute(stmt_meter_update, meter_update)
+        if meter_wl is not None:
+            if len(meter_wl['update_wl']) > 0:
+                update_wl_update = [line_umwl.model_dump(exclude_none=True) for line_umwl in meter_wl['update_wl']]
+                stmt_meter_wl_update = update(Wl)
+                await session.execute(stmt_meter_wl_update, update_wl_update)
 
-        if len(meter['create_meter']) > 0:
-            value = [line_cm.model_dump() for line_cm in meter['create_meter']]
-            meter_create = insert(Meter).values(value)
-            # print('111111111111')
-            # print(meter_create)
-            await session.execute(meter_create)
+            if len(meter_wl['create_wl']) > 0:
+                update_wl_create = [line_cmwl.model_dump() for line_cmwl in meter_wl['create_wl']]
+                meter_wl_create = insert(Wl).values(update_wl_create)
+                await session.execute(meter_wl_create)
+
+        if meter_msg is not None and len(meter_msg) > 0:
+            msg_create = [line_msg.model_dump() for line_msg in meter_msg]
+            meter_msg_create = insert(Messages).values(msg_create)
+            await session.execute(meter_msg_create)
 
         stmt_log = insert(LogEquipment).values([log.model_dump()])
         await session.execute(stmt_log)

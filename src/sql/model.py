@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class EquipmentModelSet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    serial: str | None = None
+    serial: int | None = None
     serial_in_sourse: str
     login: str = 'admin'
     passw: str = 'admin'
@@ -66,13 +66,13 @@ class EquipmentHandModelUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     equipment_id: int
-    serial: str
+    serial: int
     bs_type: str
     mode: str
-    dl_aver_busyness: str
+    dl_aver_busyness: int
     rev_list: str
-    latitude: str
-    longitude: str
+    latitude: float
+    longitude: float
 
 
 class TaskHandModelUpdate(BaseModel):
@@ -126,8 +126,7 @@ class MeterModelUpdate(BaseModel):
 class WLModelUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    equipment_id: int | None = None
-    meter_id: int | None = None
+    wl_id: int
     last_success: int | None = None
     present: bool
 
