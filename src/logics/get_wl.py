@@ -70,25 +70,32 @@ async def get_local_id(con: BaseRequest) -> EquipmentInfoModel:
         if serial.status is True:
             serial.data = json.loads(serial.data)
             result.serial = serial.data['id']
-            result.status = True
-            param_uspd = f'bs_ids={result.serial}'
+            param_uspd = f'?bs_ids={result.serial}'
             uspd_info = await con.get_request_with_params_waviot('telecom/api/bs', param_uspd)
             uspd_info.data = json.loads(uspd_info.data)
             if uspd_info.status is True:
-                if 'bs_type' in uspd_info.data[0]:
-                    result.bs_type = uspd_info.data[0]['bs_type']
-                if 'mode' in uspd_info.data[0]:
-                    result.mode = uspd_info.data[0]['mode']
-                if 'dl_aver_busyness' in uspd_info.data[0]:
-                    result.dl_aver_busyness = uspd_info.data[0]['dl_aver_busyness']
-                if 'rev_list' in uspd_info.data[0]:
-                    result.rev_list = (',').join(uspd_info.data[0]['rev_list'])
-                if 'latitude' in uspd_info.data[0]:
-                    result.latitude = uspd_info.data[0]['latitude']
-                if 'longitude' in uspd_info.data[0]:
-                    result.longitude = uspd_info.data[0]['longitude']
+                trigger_equipment = 0
+                for line_uspd in uspd_info.data:
+                    if line_uspd['bs_id'] == serial.data['id']:
+                        if 'bs_type' in line_uspd:
+                            result.bs_type = line_uspd['bs_type']
+                        if 'mode' in line_uspd:
+                            result.mode = line_uspd['mode']
+                        if 'dl_aver_busyness' in line_uspd:
+                            result.dl_aver_busyness = line_uspd['dl_aver_busyness']
+                        if 'rev_list' in line_uspd:
+                            result.rev_list = (',').join(line_uspd['rev_list'])
+                        if 'latitude' in line_uspd:
+                            result.latitude = line_uspd['latitude']
+                        if 'longitude' in line_uspd:
+                            result.longitude = line_uspd['longitude']
+                        trigger_equipment = 1
+                        result.status = True
+                        break
+                if trigger_equipment == 0:
+                    result.error = 'not number equipment in response'
         else:
-            result = None
+            result.error = 'bad response on equipment'
     except Exception as ex:
         result.error = str(ex.args)
     return result

@@ -89,7 +89,7 @@ class MeterModelSet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     modem: int
-    hw_type: str | None
+    hw_type: str | None = None
 
 
 class MeterModelGet(MeterModelSet):

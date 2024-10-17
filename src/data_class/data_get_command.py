@@ -44,7 +44,7 @@ class MeterPacketModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     uspd_serial: int
-    meter_number: int
+    number: int
     type_packet: int
     time_detected: int
     time_saved: int

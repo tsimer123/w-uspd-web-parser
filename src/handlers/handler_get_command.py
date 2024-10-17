@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from config import timeout_task
-from data_class.data_get_command import GetComandModel, MeterWlModel
+from data_class.data_get_command import GetComandModel, MeterPacketModel, MeterWlModel
 from db_handler import (
     get_meter_filter,
     get_meter_wl_filter,
@@ -52,9 +52,9 @@ async def hand_result(result_in: GetComandModel):
     print(f'{datetime.now()}: stop write data for task {result_in.task_id}, , total time {total_time}')
 
 
-def get_list_meter(meter_wl: list[MeterWlModel]) -> list[int]:
+def get_list_meter(meters: list[MeterWlModel] | list[MeterPacketModel]) -> list[int]:
     result = []
-    for line in meter_wl:
+    for line in meters:
         result.append(line.number)
     return result
 
@@ -134,7 +134,7 @@ def get_create_meter_wl(
             if line_mwl.number == line_mfd.modem:
                 trigger_meter_create = 1
                 if line_mfd.hw_type is None:
-                    result['create_meter'].append(
+                    result['update_meter'].append(
                         MeterModelUpdate(meter_id=line_mfd.meter_id, hw_type=line_mwl.hw_type)
                     )
                 break
@@ -192,7 +192,7 @@ async def hand_messages(result_in: GetComandModel) -> list[MsgModelSet]:
         and result_in.meter_packet.meter_packet is not None
         and len(result_in.meter_packet.meter_packet) > 0
     ):
-        list_meter = get_list_meter(result_in.meter_wl.meter_wl)
+        list_meter = get_list_meter(result_in.meter_packet.meter_packet)
         meter_from_db = await get_meter_filter(list_meter)
         # meter_wl_from_db = await get_meter_msg_filter(list_meter, result_in.equipment_id)
 
@@ -212,31 +212,44 @@ def get_create_meter_msg(
 ) -> dict[list[MeterModelSet], list[MeterModelUpdate]]:
     result = []
 
-    for line_mwl in result_in.meter_wl.meter_wl:
-        trigger_meter_create = 0
-        for line_mfd in meter_from_db:
-            if line_mwl.number == line_mfd.modem:
-                trigger_meter_create = 1
-                break
-        if trigger_meter_create == 0:
-            result.append(MeterModelSet(modem=line_mwl.number))
+    meters_uspd = set([line_mwl.number for line_mwl in result_in.meter_packet.meter_packet])
+    meters_db = set([line_mfd.modem for line_mfd in meter_from_db])
+
+    meters_for_db = meters_uspd - meters_db
+
+    for line_mfdb in meters_for_db:
+        result.append(MeterModelSet(modem=line_mfdb))
+
+    # for line_mwl in result_in.meter_packet.meter_packet:
+    #     trigger_meter_create = 0
+    #     for line_mfd in meter_from_db:
+    #         if line_mwl.number == line_mfd.modem:
+    #             trigger_meter_create = 1
+    #             break
+    #     if trigger_meter_create == 0:
+    #         result.append(MeterModelSet(modem=line_mwl.number))
     return result
 
 
-def get_create_msg(result_in: GetComandModel, meter_from_db: list[MeterModelGet]) -> list[MsgModelSet]:
+def get_create_msg(
+    result_in: GetComandModel, meter_from_db: list[MeterModelGet], max_time_saved: datetime
+) -> list[MsgModelSet]:
+    # добавить првоерку на старые пакеты
     create_msg = []
     for line_mwl in result_in.meter_packet.meter_packet:
-        for line_db in meter_from_db:
-            if line_db.modem == line_mwl.meter_number:
-                create_msg.append(
-                    MsgModelSet(
-                        equipment_id=result_in.equipment_id,
-                        meter_id=line_db.meter_id,
-                        type_packet=line_mwl.type_packet,
-                        time_detected=datetime.fromtimestamp(line_mwl.type_packet),
-                        time_saved=datetime.fromtimestamp(line_mwl.type_packet),
+        if datetime.fromtimestamp(line_mwl.time_saved) > max_time_saved:
+            for line_db in meter_from_db:
+                if line_db.modem == line_mwl.number:
+                    create_msg.append(
+                        MsgModelSet(
+                            equipment_id=result_in.equipment_id,
+                            meter_id=line_db.meter_id,
+                            type_packet=line_mwl.type_packet,
+                            time_detected=datetime.fromtimestamp(line_mwl.time_detected),
+                            time_saved=datetime.fromtimestamp(line_mwl.time_saved),
+                        )
                     )
-                )
+                    break
     return create_msg
 
 
