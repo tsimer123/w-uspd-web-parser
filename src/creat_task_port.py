@@ -195,7 +195,7 @@ def get_continue_task(
                 # time_restart_true_task
                 timeout_restart_true = line_t.update_on + timedelta(seconds=time_restart_true_task)
                 if line_t.status_task == 'true':
-                    if timeout_restart_true > datetime.now():
+                    if timeout_restart_true < datetime.now():
                         result['change_task'].append(
                             TaskModelUpdate(
                                 task_id=line_t.task_id,

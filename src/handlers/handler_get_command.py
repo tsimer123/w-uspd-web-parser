@@ -3,12 +3,14 @@ from datetime import datetime
 from config import timeout_task
 from data_class.data_get_command import GetComandModel, MeterPacketModel, MeterWlModel
 from db_handler import (
+    get_max_time_saved_filter_equipment,
     get_meter_filter,
     get_meter_wl_filter,
     set_meter,
     update_data_after_hand,
     update_meter,
 )
+from funcs.decorators import repit_access_to_db_not_out
 from sql.model import (
     EquipmentHandModelUpdate,
     LogHandModelSet,
@@ -23,8 +25,11 @@ from sql.model import (
 )
 
 
-# 'get_wl',
-#     'get_messages',
+@repit_access_to_db_not_out
+async def set_result_handler(task, equipment, meter_wl, meter_msg, log):
+    await update_data_after_hand(task, equipment, meter_wl, meter_msg, log)
+
+
 async def hand_result(result_in: GetComandModel):
     start_time = datetime.now()
     print(f'{datetime.now()}: start write data for task {result_in.task_id}')
@@ -43,7 +48,7 @@ async def hand_result(result_in: GetComandModel):
 
     log = hand_log(result_in)
 
-    await update_data_after_hand(task, equipment, meter_wl, meter_msg, log)
+    await set_result_handler(task, equipment, meter_wl, meter_msg, log)
 
     end_time = datetime.now()
     delta = end_time - start_time
@@ -88,6 +93,31 @@ def hand_equipment(result_in: GetComandModel) -> EquipmentHandModelUpdate | None
         return None
 
 
+# def repit_access_to_db_not_out(func):
+#     async def wrapper(*args, **kwargs):
+#         for _ in range(1, 10, 1):
+#             resutl_set_meter = await func(*args, **kwargs)
+#             if resutl_set_meter is not None:
+#                 sleep(randint(1, 5))
+#                 print(f'---------Ошибка при записи в БД {resutl_set_meter}, спим')
+#                 resutl_set_meter = await func(*args, **kwargs)
+#                 if resutl_set_meter is None:
+#                     break
+#             else:
+#                 break
+
+#     return wrapper
+
+
+@repit_access_to_db_not_out
+async def set_meter_write_db(data_list):
+    await set_meter(data_list)
+
+
+async def update_meter_write_db(data_list):
+    await update_meter(data_list)
+
+
 async def hand_wl(result_in: GetComandModel) -> dict[list[WLModelSet], list[WLModelUpdate]]:
     dict_result = {
         'create_wl': [],
@@ -106,9 +136,9 @@ async def hand_wl(result_in: GetComandModel) -> dict[list[WLModelSet], list[WLMo
         # ищем ПУ из ВЛ УСПД в БД, если их в БД нет то создаем новые
         meter = get_create_meter_wl(result_in, meter_from_db)
         if len(meter['create_meter']) > 0:
-            await set_meter(meter['create_meter'])
+            await set_meter_write_db(meter['create_meter'])
         if len(meter['update_meter']) > 0:
-            await update_meter(meter['update_meter'])
+            await update_meter_write_db(meter['update_meter'])
 
         meter_from_db = await get_meter_filter(list_meter)
         # готовим данные для создания новых ВЛ в БД
@@ -198,11 +228,14 @@ async def hand_messages(result_in: GetComandModel) -> list[MsgModelSet]:
 
         # ищем ПУ из ВЛ УСПД в БД, если их в БД нет то создаем новые
         create_meter = get_create_meter_msg(result_in, meter_from_db)
-        await set_meter(create_meter)
+        if len(create_meter) > 0:
+            await set_meter_write_db(create_meter)
 
         meter_from_db = await get_meter_filter(list_meter)
         # готовим данные для создания новых ВЛ в БД
-        create_wl = get_create_msg(result_in, meter_from_db)
+        max_time_saved = await get_max_time_saved_filter_equipment(result_in.equipment_id)
+
+        create_wl = get_create_msg(result_in, meter_from_db, max_time_saved)
 
     return create_wl
 
@@ -232,11 +265,14 @@ def get_create_meter_msg(
 
 
 def get_create_msg(
-    result_in: GetComandModel, meter_from_db: list[MeterModelGet], max_time_saved: datetime
+    result_in: GetComandModel, meter_from_db: list[MeterModelGet], max_time_saved: datetime | None
 ) -> list[MsgModelSet]:
     # добавить првоерку на старые пакеты
+    if max_time_saved is None:
+        max_time_saved = datetime(1990, 2, 20)
     create_msg = []
     for line_mwl in result_in.meter_packet.meter_packet:
+        # print(datetime.fromtimestamp(line_mwl.time_saved))
         if datetime.fromtimestamp(line_mwl.time_saved) > max_time_saved:
             for line_db in meter_from_db:
                 if line_db.modem == line_mwl.number:
