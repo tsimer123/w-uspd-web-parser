@@ -30,8 +30,8 @@ class Equipment(Base):
     mode: Mapped[str | None] = mapped_column(Text)
     dl_aver_busyness: Mapped[int | None] = mapped_column(Integer)
     rev_list: Mapped[str | None] = mapped_column(Text)
-    latitude: Mapped[str | None] = mapped_column(Text)
-    longitude: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[float | None] = mapped_column(Text)
+    longitude: Mapped[float | None] = mapped_column(Text)
     created_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     update_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from sqlalchemy import and_, insert, select, update
+from sqlalchemy import and_, func, insert, select, update
 
 from config import db_name
 from db_handler_init import (
@@ -197,27 +197,56 @@ async def get_meter_wl_filter(in_meter: list[str], equipment_id) -> list[MeterWL
     return uspd_get
 
 
-async def set_meter(meter: list[MeterModelSet]) -> None:
-    # a = [line_eq.model_dump(exclude_none=True) for line_eq in equipment]
-    stmt = insert(Meter).values([line_m.model_dump() for line_m in meter])
+async def get_max_time_saved_filter_equipment(equipment_id) -> datetime:
+    """Получение максимальной даты сохрарения пакетов в УСПД по конкретной УСПД"""
+    stmt = select(func.max(Messages.time_saved)).where(Messages.equipment_id == equipment_id)
 
     session = [session async for session in get_async_session()][0]
 
-    await session.execute(stmt)
-    await session.commit()
+    result = await session.execute(stmt)
+
+    max_time_saved = None
+
+    for a in result.scalars():
+        max_time_saved = a
+
     await session.close()
+
+    return max_time_saved
+
+
+async def set_meter(meter: list[MeterModelSet]) -> None:
+    # a = [line_eq.model_dump(exclude_none=True) for line_eq in equipment]
+
+    session = [session async for session in get_async_session()][0]
+    try:
+        stmt = insert(Meter).values([line_m.model_dump() for line_m in meter])
+        await session.execute(stmt)
+        await session.commit()
+        result = None
+    except Exception as ex:
+        await session.rollback()
+        result = ex.args
+        print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}, set_meter')
+    await session.close()
+    return result
 
 
 async def update_meter(meter: list[MeterModelUpdate]) -> None:
-    data_update = [line_m.model_dump() for line_m in meter]
-
     session = [session async for session in get_async_session()][0]
-
-    stmt = update(Meter)
-    # print(stmt)
-    await session.execute(stmt, data_update)
-    await session.commit()
+    try:
+        data_update = [line_m.model_dump() for line_m in meter]
+        stmt = update(Meter)
+        # print(stmt)
+        await session.execute(stmt, data_update)
+        await session.commit()
+        result = None
+    except Exception as ex:
+        await session.rollback()
+        result = ex.args
+        print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}, update_meter')
     await session.close()
+    return result
 
 
 async def get_meter_msg_filter(in_meter: list[str], equipment_id) -> list[MeterMsgHandModelGet]:
@@ -288,5 +317,5 @@ async def update_data_after_hand(
         await session.commit()
     except Exception as ex:
         await session.rollback()
-        print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}')
+        print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}, task: {task.task_id}')
     await session.close()

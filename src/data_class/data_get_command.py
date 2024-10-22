@@ -76,8 +76,8 @@ class EquipmentInfoModel(BaseModel):
     mode: str | None = None
     dl_aver_busyness: int | None = None
     rev_list: str | None = None
-    latitude: str | None = None
-    longitude: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class GetComandModel(BaseModel):
