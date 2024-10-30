@@ -56,6 +56,10 @@ async def get_wl(task_rb: TaskEquipmentHandlerModelGet) -> GetComandModel:
                     result.error = result.equipment_info.error
             except Exception as ex:
                 result.error = str(ex.args)
+        else:
+            print('????')
+            print(str(auth.error))
+            result.error = str(auth.error)
     end_time = datetime.now()
     delta = end_time - start_time
     result.total_time = round(delta.total_seconds())

@@ -23,6 +23,7 @@ from sql.model import (
     MeterModelUpdate,
     MeterMsgHandModelGet,
     MeterWLHandModelGet,
+    MsgBsModelSet,
     MsgModelSet,
     TaskEquipmentHandlerModelGet,
     TaskEquipmentModelGet,
@@ -32,7 +33,7 @@ from sql.model import (
     WLModelSet,
     WLModelUpdate,
 )
-from sql.scheme import Equipment, GroupTask, LogEquipment, Messages, Meter, Task, Wl, create_db
+from sql.scheme import Equipment, GroupTask, LogEquipment, Messages, MessagesBs, Meter, Task, Wl, create_db
 
 
 async def start_db(type_start):
@@ -122,16 +123,23 @@ async def get_task_grouptask(group_task_id: int, time_zone: int) -> list[TaskEqu
     return task_get
 
 
-async def update_task(task: list[TaskModelUpdate]) -> None:
-    data_update = [line_t.model_dump(exclude_none=True) for line_t in task]
-
+async def update_task(task: list[TaskModelUpdate]) -> None | str:
     session = [session async for session in get_async_session()][0]
 
-    stmt = update(Task)
-    # print(stmt)
-    await session.execute(stmt, data_update)
-    await session.commit()
+    try:
+        data_update = [line_t.model_dump(exclude_none=True) for line_t in task]
+        stmt = update(Task)
+        await session.execute(stmt, data_update)
+        await session.commit()
+        result = None
+    except Exception as ex:
+        await session.rollback()
+        result = str(ex.args)
+        print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}, update_task')
+
     await session.close()
+
+    return result
 
 
 async def set_grouptask() -> int:
@@ -152,28 +160,31 @@ async def set_grouptask() -> int:
     return group_task_id
 
 
-async def get_meter_filter(in_meter: list[str]) -> list[MeterModelGet]:
+async def get_meter_filter(in_meter: list[int]) -> list[MeterModelGet]:
     """получение всех ПУ из БД по номеру"""
-    stmt = select(Meter).where(Meter.modem.in_(in_meter))
 
     session = [session async for session in get_async_session()][0]
+    try:
+        stmt = select(Meter).where(Meter.modem.in_(in_meter))
+        result_request = await session.execute(stmt)
+        result = []
 
-    result = await session.execute(stmt)
+        for a in result_request.scalars():
+            result.append(init_get_meter(a))
 
-    uspd_get = []
-
-    for a in result.scalars():
-        uspd_get.append(init_get_meter(a))
-
+    except Exception as ex:
+        await session.rollback()
+        result = f'error: {ex.args}'
+        print(f'{datetime.now()}: ---------- Ошибка чтения в БД сервиса: {ex.args}, get_meter_filter')
     await session.close()
 
-    return uspd_get
+    return result
 
 
 async def get_meter_wl_filter(in_meter: list[str], equipment_id) -> list[MeterWLHandModelGet]:
     """получение всех ПУ из БД по номеру"""
     stmt = (
-        select(Meter, Wl)
+        select(Wl, Meter)
         .join(Meter.wl)
         .where(
             and_(
@@ -281,41 +292,107 @@ async def update_data_after_hand(
     equipment: EquipmentHandModelUpdate | None,
     meter_wl: dict[list[WLModelSet], list[WLModelUpdate]],
     meter_msg: list[MsgModelSet],
+    meter_msg_bs: list[MsgBsModelSet],
     log: LogHandModelSet,
-) -> None:
+) -> str | None:
     """Занесение результатов по одной таске get_command"""
     session = [session async for session in get_async_session()][0]
+    result = None
     try:
         task_update = [task.model_dump()]
         stmt_task = update(Task)
         await session.execute(stmt_task, task_update)
 
-        if equipment is not None:
-            equipment_update = [equipment.model_dump()]
-            stmt_equipment = update(Equipment)
-            await session.execute(stmt_equipment, equipment_update)
+        try:
+            if equipment is not None:
+                equipment_update = [equipment.model_dump()]
+                stmt_equipment = update(Equipment)
+                await session.execute(stmt_equipment, equipment_update)
+        except Exception as ex:
+            print(f'Ошибка записи в БД (update_data_after_hand) - equipment {ex}')
+            result = str(ex.args)
 
         if meter_wl is not None:
-            if len(meter_wl['update_wl']) > 0:
-                update_wl_update = [line_umwl.model_dump(exclude_none=True) for line_umwl in meter_wl['update_wl']]
-                stmt_meter_wl_update = update(Wl)
-                await session.execute(stmt_meter_wl_update, update_wl_update)
+            try:
+                if len(meter_wl['update_wl']) > 0:
+                    update_wl_update = [line_umwl.model_dump(exclude_none=True) for line_umwl in meter_wl['update_wl']]
+                    stmt_meter_wl_update = update(Wl)
+                    await session.execute(stmt_meter_wl_update, update_wl_update)
+            except Exception as ex:
+                print(f"Ошибка записи в БД (update_data_after_hand) - meter_wl['update_wl'] {ex}")
+                result = str(ex.args)
 
-            if len(meter_wl['create_wl']) > 0:
-                update_wl_create = [line_cmwl.model_dump() for line_cmwl in meter_wl['create_wl']]
-                meter_wl_create = insert(Wl).values(update_wl_create)
-                await session.execute(meter_wl_create)
+            try:
+                if len(meter_wl['create_wl']) > 0:
+                    update_wl_create = [line_cmwl.model_dump() for line_cmwl in meter_wl['create_wl']]
+                    meter_wl_create = insert(Wl).values(update_wl_create)
+                    await session.execute(meter_wl_create)
+            except Exception as ex:
+                print(f"Ошибка записи в БД (update_data_after_hand) - meter_wl['create_wl'] {ex}")
+                result = str(ex.args)
 
-        if meter_msg is not None and len(meter_msg) > 0:
-            msg_create = [line_msg.model_dump() for line_msg in meter_msg]
-            meter_msg_create = insert(Messages).values(msg_create)
-            await session.execute(meter_msg_create)
+        try:
+            if meter_msg is not None and len(meter_msg) > 0:
+                msg_create = [line_msg.model_dump() for line_msg in meter_msg]
+                if len(msg_create) > 1000:
+                    step_msg = 1000
+                    for i_msg in range(0, len(msg_create), step_msg):
+                        meter_msg_create = insert(Messages).values(msg_create[i_msg : i_msg + step_msg])
+                else:
+                    meter_msg_create = insert(Messages).values(msg_create)
+                await session.execute(meter_msg_create)
+        except Exception as ex:
+            print(f'Ошибка записи в БД (update_data_after_hand) - meter_msg {ex}')
+            result = str(ex.args)
 
-        stmt_log = insert(LogEquipment).values([log.model_dump()])
-        await session.execute(stmt_log)
+        try:
+            if meter_msg_bs is not None and len(meter_msg_bs) > 0:
+                msg_bs_create = [line_msg_bs.model_dump() for line_msg_bs in meter_msg_bs]
+                meter_msg_bs_create = insert(MessagesBs).values(msg_bs_create)
+                await session.execute(meter_msg_bs_create)
+        except Exception as ex:
+            print(f'Ошибка записи в БД (update_data_after_hand) - meter_msg_bs {ex}')
+            result = str(ex.args)
 
-        await session.commit()
+        try:
+            if log is not None:
+                stmt_log = insert(LogEquipment).values([log.model_dump()])
+                await session.execute(stmt_log)
+        except Exception as ex:
+            print(f'Ошибка записи в БД (update_data_after_hand) - log {ex}')
+            result = str(ex.args)
+
+        if result is not None:
+            await session.rollback()
+            print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса (внутри): {result}, task: {task.task_id}')
+        else:
+            await session.commit()
+    except TypeError as ex_te:
+        await session.rollback()
+        print(f'{datetime.now()}: ---------- Ошибка TypeError записи в БД сервиса: {ex_te.args}, task: {task.task_id}')
+        result = str(ex_te.args)
     except Exception as ex:
         await session.rollback()
         print(f'{datetime.now()}: ---------- Ошибка записи в БД сервиса: {ex.args}, task: {task.task_id}')
+        result = str(ex.args)
     await session.close()
+
+    return result
+
+
+async def get_max_time_saved_bs_filter_equipment(equipment_id) -> datetime:
+    """Получение максимальной даты сохрарения пакетов для базовой станции в УСПД по конкретной УСПД"""
+    stmt = select(func.max(MessagesBs.time_saved)).where(MessagesBs.equipment_id == equipment_id)
+
+    session = [session async for session in get_async_session()][0]
+
+    result = await session.execute(stmt)
+
+    max_time_saved = None
+
+    for a in result.scalars():
+        max_time_saved = a
+
+    await session.close()
+
+    return max_time_saved

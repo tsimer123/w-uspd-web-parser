@@ -127,7 +127,7 @@ class WLModelUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     wl_id: int
-    last_success: int | None = None
+    last_success: datetime | None = None
     present: bool
 
 
@@ -136,7 +136,7 @@ class WLModelSet(BaseModel):
 
     equipment_id: int
     meter_id: int
-    last_success: int
+    last_success: datetime | None = None
     present: bool
 
 
@@ -157,3 +157,22 @@ class LogHandModelSet(BaseModel):
     equipment_id: int
     status_response: bool
     response: str | None = None
+
+
+class MsgBsModelSet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    equipment_id: int
+    meter_id: int
+    time_saved: datetime | None = None
+    count_meter_min: int
+    dump_packet: str | list = []
+    # freq: int
+    # iterator: int
+    # offset: int
+    # payload: str
+    # phy: str
+    # type_packet: int
+    # nsnr: int
+    # rssi_or_pwr: int
+    # snr: int

@@ -24,7 +24,7 @@ async def main():
 
     await start_db(type_start)
 
-    print(1)
+    # print(1)
 
     customer_queue = Queue(queue_count)
 
