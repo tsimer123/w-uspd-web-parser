@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.schema import UniqueConstraint
 
 from sql.engine import async_engine
 
@@ -39,6 +40,7 @@ class Equipment(Base):
     task: Mapped[list['Task']] = relationship(back_populates='equipment')
     wl: Mapped[list['Wl']] = relationship(back_populates='equipment')
     messages: Mapped[list['Messages']] = relationship(back_populates='equipment')
+    messages_bs: Mapped[list['MessagesBs']] = relationship(back_populates='equipment')
 
 
 class Meter(Base):
@@ -53,6 +55,13 @@ class Meter(Base):
 
     wl: Mapped[list['Wl']] = relationship(back_populates='meter')
     messages: Mapped[list['Messages']] = relationship(back_populates='meter')
+    messages_bs: Mapped[list['MessagesBs']] = relationship(back_populates='meter')
+
+    __table_args__ = (
+        UniqueConstraint(
+            'modem',
+        ),
+    )
 
 
 class LogEquipment(Base):
@@ -110,7 +119,7 @@ class Wl(Base):
     wl_id: Mapped[int] = mapped_column(primary_key=True)
     equipment_id: Mapped[int] = mapped_column(Integer, ForeignKey('equipment.equipment_id'))
     meter_id: Mapped[int] = mapped_column(Integer, ForeignKey('meter.meter_id'))
-    last_success: Mapped[int] = mapped_column(Integer)
+    last_success: Mapped[datetime] = mapped_column(DateTime)
     present: Mapped[bool] = mapped_column(Boolean)
     created_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     update_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -134,3 +143,29 @@ class Messages(Base):
 
     equipment: Mapped['Equipment'] = relationship(back_populates='messages')
     meter: Mapped['Meter'] = relationship(back_populates='messages')
+
+
+class MessagesBs(Base):
+    # Связь Белого Списка между УСПД и ПУ
+    __tablename__ = 'messages_bs'
+
+    messages_id: Mapped[int] = mapped_column(primary_key=True)
+    equipment_id: Mapped[int] = mapped_column(Integer, ForeignKey('equipment.equipment_id'))
+    meter_id: Mapped[int] = mapped_column(Integer, ForeignKey('meter.meter_id'))
+    time_saved: Mapped[datetime] = mapped_column(DateTime)
+    count_meter_min: Mapped[int] = mapped_column(Integer)
+    dump_packet: Mapped[str] = mapped_column(Text)
+    # freq: Mapped[int] = mapped_column(Integer)
+    # iterator: Mapped[int] = mapped_column(Integer)
+    # offset: Mapped[int] = mapped_column(Integer)
+    # payload: Mapped[str] = mapped_column(Text)
+    # phy: Mapped[str] = mapped_column(Text)
+    # type_packet: Mapped[str] = mapped_column(Integer)
+    # nsnr: Mapped[int] = mapped_column(Integer)
+    # rssi_or_pwr: Mapped[int] = mapped_column(Integer)
+    # snr: Mapped[int] = mapped_column(Integer)
+    created_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    update_on: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    equipment: Mapped['Equipment'] = relationship(back_populates='messages_bs')
+    meter: Mapped['Meter'] = relationship(back_populates='messages_bs')

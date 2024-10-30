@@ -80,20 +80,6 @@ class EquipmentInfoModel(BaseModel):
     longitude: float | None = None
 
 
-class GetComandModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    task_id: int
-    equipment_id: int
-    type_task: str
-    status_task: str
-    meter_wl: MeterWlAllModel | None = None
-    meter_packet: MeterPacketAllModel | None = None
-    equipment_info: EquipmentInfoModel | None = None
-    error: str | None = None
-    total_time: int | None = None
-
-
 class GetResultTaskModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -108,3 +94,43 @@ class StatusHandModel(BaseModel):
     status: bool = False
     list_task: list[ListTaskModel]
     error: str | None = None
+
+
+class MeterPacketBsModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    uspd_serial: int
+    number: int
+    freq: int
+    iterator: int
+    offset: int
+    payload: str
+    phy: str
+    type_packet: str
+    time_saved: int
+    nsnr: int
+    rssi_or_pwr: int
+    snr: int
+
+
+class MeterPacketBsAllModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    status: bool
+    error: str | None = None
+    meter_packet_bs: list[MeterPacketBsModel] | str | None = None
+
+
+class GetComandModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    task_id: int
+    equipment_id: int
+    type_task: str
+    status_task: str
+    meter_wl: MeterWlAllModel | None = None
+    meter_packet: MeterPacketAllModel | None = None
+    meter_packet_bs: MeterPacketBsAllModel | None = None
+    equipment_info: EquipmentInfoModel | None = None
+    error: str | None = None
+    total_time: int | None = None

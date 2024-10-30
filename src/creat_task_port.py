@@ -15,6 +15,7 @@ from db_handler import (
     update_task,
 )
 from excel import open_excel
+from funcs.decorators import repit_access_to_db_not_out
 from handler_commands import run_command
 from sql.model import (
     EquipmentModelGet,
@@ -28,19 +29,19 @@ from sql.model import (
 
 
 def clear_sourse_uspd(uspd: list[list]) -> list[list]:
-    print(f'{datetime.now()}: start clear_sourse_uspd')
+    # print(f'{datetime.now()}: start clear_sourse_uspd')
     count_u = 0
 
     while count_u < len(uspd):
         if len(uspd[count_u]) > 2 and uspd[count_u][2] is None:
             uspd[count_u][2] = None
         count_u += 1
-    print(f'{datetime.now()}: stop clear_sourse_uspd')
+    # print(f'{datetime.now()}: stop clear_sourse_uspd')
     return uspd
 
 
 def valid_сcommand_param(uspd: list[list]) -> None:
-    print(f'{datetime.now()}: start command_valid_param')
+    # print(f'{datetime.now()}: start command_valid_param')
     # set_shedule_param = set(list_shedule_param)
     for line in uspd:
         # проверка правильность записи команды
@@ -60,11 +61,11 @@ def valid_сcommand_param(uspd: list[list]) -> None:
         else:
             raise Exception(f'Неизвестная команда {line[4]}')
 
-    print(f'{datetime.now()}: stop convert_sours_to_dict')
+    # print(f'{datetime.now()}: stop convert_sours_to_dict')
 
 
 def convert_sours_to_dict(uspd: list[list]) -> list[EquipmentInExcel]:
-    print(f'{datetime.now()}: start convert_sours_to_dict')
+    # print(f'{datetime.now()}: start convert_sours_to_dict')
     result = []
     count = 1
     for line in uspd:
@@ -77,7 +78,7 @@ def convert_sours_to_dict(uspd: list[list]) -> list[EquipmentInExcel]:
         temp_dict = EquipmentInExcel(uspd=temp_uspd, command=line[4], param_data=param_data)
         result.append(temp_dict)
         count += 1
-    print(f'{datetime.now()}: stop convert_sours_to_dict')
+    # print(f'{datetime.now()}: stop convert_sours_to_dict')
     return result
 
 
@@ -171,7 +172,7 @@ def get_continue_task(
             if line_uin.uspd.name == line_t.serial_in_sourse and line_uin.command == line_t.type_task:
                 if line_t.status_task == 'start':
                     timeout_for_task = line_t.update_on + timedelta(seconds=line_t.timeouut_task)
-                    if timeout_for_task > datetime.now():
+                    if timeout_for_task < datetime.now():
                         result['change_task'].append(
                             TaskModelUpdate(
                                 task_id=line_t.task_id,
@@ -238,10 +239,15 @@ def get_restart_task(
     return task
 
 
+@repit_access_to_db_not_out
+async def update_task_write_db(data):
+    await update_task(data)
+
+
 async def get_task(
     type_start: str, counter_iter: int, group_task_id: int, time_zone: int
 ) -> list[TaskEquipmentHandlerModelGet]:
-    print(f'{datetime.now()}: start get_task_from_excel')
+    # print(f'{datetime.now()}: start get_task_from_excel')
     # получаем из excel файла задания  (УСПД с командой)
     data = open_excel('host.xlsx')
     # убираем None если нет второго ip
@@ -276,10 +282,11 @@ async def get_task(
         # получаем все таски по id УСПД
         task_equipment = await get_task_equipment_filter(equipment_id)
         if type_start == 'continue' or (type_start == 'clear' and counter_iter != 0):
-            # если запуск с параметром continue то пересоздаем просрочекные стартовые или неудачные таски или отклыдываем их
+            # если запуск с параметром continue то пересоздаем просроченные стартовые или неудачные таски
+            # или отклыдываем их
             contunue_task = get_continue_task(group_task_id, task_equipment, data, uspd_in_db)
             if len(contunue_task['change_task']) > 0:
-                await update_task(contunue_task['change_task'])
+                await update_task_write_db(contunue_task['change_task'])
             if len(contunue_task['eq_not_task']) > 0:
                 task_contimue_new_eqp = init_set_task_start(uspd_in_db, contunue_task['eq_not_task'], group_task_id)
                 await set_task(task_contimue_new_eqp)
@@ -287,7 +294,7 @@ async def get_task(
             # если запуск с параметром restart то пересоздаем все таски
             restart_task = get_restart_task(task_equipment, uspd_in_db)
             if len(restart_task['change_task']) > 0:
-                await update_task(restart_task['change_task'])
+                await update_task_write_db(restart_task['change_task'])
             if len(restart_task['eq_not_task']) > 0:
                 new_task = init_set_task_start(restart_task['eq_not_task'], data)
                 await set_task(new_task)

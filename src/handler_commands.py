@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from config import list_msg_command
 from handlers.handler_get_command import hand_result
 from logics.get_messages import get_messages
 from logics.get_wl import get_wl
@@ -16,7 +17,7 @@ async def run_command(task_rb: TaskEquipmentHandlerModelGet):
         result = await get_wl(task_rb)
         await hand_result(result)
 
-    if task_rb.type_task == 'get_messages':
+    if task_rb.type_task in list_msg_command:
         result = await get_messages(task_rb)
         await hand_result(result)
 

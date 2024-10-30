@@ -67,11 +67,13 @@ def init_get_meter(meter: Meter) -> MeterModelGet:
 
 def init_get_meter_wl(meter: Meter) -> MeterWLHandModelGet:
     temp_meter = MeterWLHandModelGet(
-        meter_id=meter.meter_id,
-        modem=meter.modem,
-        hw_type=meter.hw_type,
-        wl_id=meter.wl.wl_id,
-        present=meter.wl.present,
+        meter_id=meter.meter.meter_id,
+        modem=meter.meter.modem,
+        hw_type=meter.meter.hw_type,
+        created_on=meter.meter.created_on,
+        update_on=meter.meter.update_on,
+        wl_id=meter.wl_id,
+        present=meter.present,
     )
     return temp_meter
 

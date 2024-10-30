@@ -1,0 +1,8 @@
+logging:
+  state_db: 0
+
+db:
+  db_name: "sqlite_python_alchemy.db"
+
+request:
+  time_restart_true_task: 3600
